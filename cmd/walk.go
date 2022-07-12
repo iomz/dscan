@@ -6,14 +6,17 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"regexp"
 
 	"github.com/karrick/godirwalk"
 	"github.com/spf13/cobra"
 )
 
+// Ignore contains paths to ignore
+var Ignore []string
+
 func init() {
-	//walkCmd.Flags().StringVarP(&Output, "out", "o", "", "output file")
+	walkCmd.Flags().StringSliceVarP(&Ignore, "ignore", "i", []string{"^\\..*", "Thums\\.db", "\\.DS_Store", "\\.\\_.*"}, "regexp patterns to ignore")
 	rootCmd.AddCommand(walkCmd)
 }
 
@@ -38,21 +41,24 @@ var walkCmd = &cobra.Command{
 
 		err = godirwalk.Walk(path, &godirwalk.Options{
 			Callback: func(osPathname string, de *godirwalk.Dirent) error {
-				// don't print dirs
-				if de.IsDir() {
-					if strings.HasPrefix(filepath.Base(osPathname), ".") {
+				for _, p := range Ignore {
+					if match, _ := regexp.MatchString(p, filepath.Base(osPathname)); match {
 						return godirwalk.SkipThis
 					}
+				}
+
+				// don't print dirs
+				if de.IsDir() {
+					return nil
+				}
+
+				if de.IsSymlink() {
 					return nil
 				}
 
 				st, err := os.Stat(osPathname)
 				switch err {
 				case nil:
-					if strings.HasPrefix(st.Name(), ".") {
-						// don't print anything to a hidden file
-						return nil
-					}
 					_, err = fmt.Printf("%v\t% 12d\t%s\n", st.ModTime().Format("2006-01-02 15:04:05"), st.Size(), osPathname)
 				default:
 					// ignore the error and just show the mode type
