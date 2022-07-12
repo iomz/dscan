@@ -16,7 +16,7 @@ import (
 var Ignore []string
 
 func init() {
-	walkCmd.Flags().StringSliceVarP(&Ignore, "ignore", "i", []string{"^\\..*", "Thums\\.db", "\\.DS_Store", "\\.\\_.*"}, "regexp patterns to ignore")
+	walkCmd.Flags().StringSliceVarP(&Ignore, "ignore", "i", []string{"^\\..*", "Thumbs\\.db", "\\.DS_Store", "\\.\\_.*"}, "regexp patterns to ignore")
 	rootCmd.AddCommand(walkCmd)
 }
 
@@ -52,13 +52,18 @@ var walkCmd = &cobra.Command{
 					return nil
 				}
 
+				// ignore symlinks
 				if de.IsSymlink() {
-					return nil
+					return godirwalk.SkipThis
 				}
 
 				st, err := os.Stat(osPathname)
 				switch err {
 				case nil:
+					// ignore files without extention
+					if filepath.Ext(osPathname) == "" {
+						return nil
+					}
 					_, err = fmt.Printf("%v\t% 12d\t%s\n", st.ModTime().Format("2006-01-02 15:04:05"), st.Size(), osPathname)
 				default:
 					// ignore the error and just show the mode type
