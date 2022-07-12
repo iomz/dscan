@@ -1,7 +1,5 @@
-/*
-Copyright © 2022 Iori Mizutani <iori.mizutani@gmail.com>
+// Copyright © 2022 Iori Mizutani <iori.mizutani@gmail.com>
 
-*/
 package cmd
 
 import (
@@ -14,11 +12,9 @@ import (
 )
 
 func init() {
-	walkCmd.Flags().StringVarP(&Output, "out", "o", "", "output file")
+	//walkCmd.Flags().StringVarP(&Output, "out", "o", "", "output file")
 	rootCmd.AddCommand(walkCmd)
 }
-
-var Output string
 
 var walkCmd = &cobra.Command{
 	Use:   "walk",
@@ -33,12 +29,22 @@ var walkCmd = &cobra.Command{
 		if !dir.IsDir() {
 			return fmt.Errorf("%q is not a directory", dir.Name())
 		}
-		err = godirwalk.Walk(dir, &godirwalk.Options{
+		err = godirwalk.Walk(dir.Name(), &godirwalk.Options{
 			Callback: func(osPathname string, de *godirwalk.Dirent) error {
-				if strings.Contains(osPathname, ".git") {
+				if strings.HasPrefix(osPathname, ".git") {
 					return godirwalk.SkipThis
 				}
-				fmt.Printf("%s %s\n", de.ModeType(), osPathname)
+				if de.IsDir() {
+					return nil
+				}
+				st, err := os.Stat(osPathname)
+				switch err {
+				case nil:
+					_, err = fmt.Printf("% 12d %v %s\n", st.Size(), st.ModTime(), osPathname)
+				default:
+					// ignore the error and just show the mode type
+					_, err = fmt.Printf("%s % 12d %s\n", de.ModeType(), st.Size(), osPathname)
+				}
 				return nil
 			},
 			Unsorted: true,
