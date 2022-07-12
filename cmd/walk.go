@@ -5,6 +5,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/karrick/godirwalk"
@@ -22,28 +23,40 @@ var walkCmd = &cobra.Command{
 	Long:  `Walk the directory and output the result`,
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		dir, err := os.Stat(args[0])
+		path := args[0]
+		dir, err := os.Stat(path)
 		if err != nil {
 			return fmt.Errorf("failed to open directory, error: %w", err)
 		}
 		if !dir.IsDir() {
 			return fmt.Errorf("%q is not a directory", dir.Name())
 		}
-		err = godirwalk.Walk(dir.Name(), &godirwalk.Options{
+		path, err = filepath.Abs(path)
+		if err != nil {
+			return err
+		}
+
+		err = godirwalk.Walk(path, &godirwalk.Options{
 			Callback: func(osPathname string, de *godirwalk.Dirent) error {
-				if strings.HasPrefix(osPathname, ".git") {
-					return godirwalk.SkipThis
-				}
+				// don't print dirs
 				if de.IsDir() {
+					if strings.HasPrefix(filepath.Base(osPathname), ".") {
+						return godirwalk.SkipThis
+					}
 					return nil
 				}
+
 				st, err := os.Stat(osPathname)
 				switch err {
 				case nil:
-					_, err = fmt.Printf("% 12d %v %s\n", st.Size(), st.ModTime(), osPathname)
+					if strings.HasPrefix(st.Name(), ".") {
+						// don't print anything to a hidden file
+						return nil
+					}
+					_, err = fmt.Printf("%v\t% 12d\t%s\n", st.ModTime().Format("2006-01-02 15:04:05"), st.Size(), osPathname)
 				default:
 					// ignore the error and just show the mode type
-					_, err = fmt.Printf("%s % 12d %s\n", de.ModeType(), st.Size(), osPathname)
+					_, err = fmt.Printf("%s\n", osPathname)
 				}
 				return nil
 			},
